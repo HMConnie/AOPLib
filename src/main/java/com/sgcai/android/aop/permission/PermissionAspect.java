@@ -1,12 +1,12 @@
 package com.sgcai.android.aop.permission;
 
+
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
 import com.sgcai.android.aop.AopSDK;
 import com.sgcai.android.aop.callback.PermissionCallback;
-import com.yanzhenjie.permission.Action;
-import com.yanzhenjie.permission.AndPermission;
+import com.tbruyelle.rxpermissions2.RxPermissions;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -14,6 +14,12 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 
 import java.util.List;
+
+import io.reactivex.Observable;
+import io.reactivex.Scheduler;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
 
 @Aspect
 public class PermissionAspect {
@@ -48,28 +54,27 @@ public class PermissionAspect {
             joinPoint.proceed();
             return;
         }
+        RxPermissions rxPermissions = new RxPermissions(target);
+        rxPermissions.request(permissionItem.permissions)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<Boolean>() {
+                    @Override
+                    public void accept(Boolean granted) {
+                        if (granted) {
+                            try {
+                                joinPoint.proceed();
+                            } catch (Throwable throwable) {
+                                throwable.printStackTrace();
+                            }
+                        } else {
+                            for (PermissionCallback callback : AopSDK.getPermissionCallback()) {
+                                callback.onPermissionDenied(permissionItem);
+                            }
+                        }
+                    }
+                });
 
-        AndPermission.with(target)
-                .runtime()
-                .permission(permissionItem.permissions)
-                .onGranted(new Action<List<String>>() {
-                    @Override
-                    public void onAction(List<String> data) {
-                        try {
-                            joinPoint.proceed();
-                        } catch (Throwable throwable) {
-                            throwable.printStackTrace();
-                        }
-                    }
-                })
-                .onDenied(new Action<List<String>>() {
-                    @Override
-                    public void onAction(List<String> data) {
-                        for (PermissionCallback callback : AopSDK.getPermissionCallback()) {
-                            callback.onPermissionDenied(permissionItem);
-                        }
-                    }
-                })
-                .start();
+
     }
 }

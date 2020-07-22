@@ -1,10 +1,8 @@
 package com.sgcai.android.aop.permission;
 
-import com.yanzhenjie.permission.runtime.PermissionDef;
 
 public class PermissionItem {
 
-    @PermissionDef
     public String[] permissions;
     public int requestPermissionId;
 
